@@ -168,26 +168,29 @@
 
 /* --- Specific Box Styling --- */
 .invoice-request-box {
-    background-color: #e8f5e9; /* Light green */
-    border-color: #a5d6a7; /* A slightly darker green border */
+    background-color: #e7f5ff; /* Light blue, as per suggestion */
+    border-color: #b3e5fc; /* A slightly darker blue border */
 }
 
-/* --- Header Icons --- */
+/* --- Header Icons (using FontAwesome) --- */
 .ccif-box h2::before {
     display: inline-block;
-    font-size: 1.2rem;
-    margin-left: 10px; /* Space between icon and text */
-    vertical-align: -2px;
+    font-family: 'Font Awesome 5 Free', 'FontAwesome'; /* Use FontAwesome */
+    font-weight: 900; /* Required for solid icons */
+    font-size: 1.1rem;
+    margin-left: 12px; /* Space between icon and text */
+    vertical-align: -1px;
+    color: var(--ccif-accent-color);
 }
 
 .ccif-person-info-header::before {
-    content: '👤'; /* User icon */
+    content: '\f007'; /* fa-user */
 }
 
 .ccif-address-info-header::before {
-    content: '🚚'; /* Truck/Shipping icon */
+    content: '\f0d1'; /* fa-truck */
 }
 
 .ccif-order-notes-header::before {
-    content: '📝'; /* Notes icon */
+    content: '\f303'; /* fa-pencil-alt */
 }

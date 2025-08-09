@@ -1,29 +1,88 @@
 jQuery(function($) {
     'use strict';
 
+    // --- Caching DOM Elements ---
+    const $checkoutForm = $('form.checkout');
+    const $invoiceCheckbox = $('#billing_invoice_request');
+    const $buyerInfoWrapper = $('#ccif-buyer-info-wrapper');
+    const $personTypeSelect = $('#billing_person_type');
+    const $realPersonWrapper = $('.ccif-real-person-fields-wrapper');
+    const $legalPersonWrapper = $('.ccif-legal-person-fields-wrapper');
+
+    // --- City/State Data Check ---
     if (typeof ccifData === 'undefined' || !ccifData.cities) {
         console.error('CCIF Iran Checkout: City data is not available.');
         return;
     }
-    var cities = ccifData.cities;
+    const cities = ccifData.cities;
 
     /**
-     * Toggles visibility of real/legal person fields.
+     * Toggles the required status and visual indicator for a set of fields.
+     * @param {jQuery} $wrapper - The jQuery object containing the fields.
+     * @param {boolean} isRequired - Whether the fields should be required.
+     */
+    function setFieldsRequired($wrapper, isRequired) {
+        const $fields = $wrapper.find('input, select');
+        $fields.each(function() {
+            const $field = $(this);
+            const $parentRow = $field.closest('.form-row');
+
+            $field.prop('required', isRequired);
+            $parentRow.toggleClass('ccif-is-required', isRequired);
+
+            // If making not required, also remove WooCommerce's 'validate-required' class if it exists
+            if (!isRequired) {
+                $parentRow.removeClass('validate-required');
+            } else {
+                 $parentRow.addClass('validate-required');
+            }
+        });
+    }
+
+    /**
+     * Shows/hides fields based on the selected person type ('real' or 'legal').
      */
     function togglePersonFields() {
-        var personType = $('#billing_person_type').val();
-        var $realPersonWrapper = $('.ccif-real-person-fields-wrapper');
-        var $legalPersonWrapper = $('.ccif-legal-person-fields-wrapper');
+        const personType = $personTypeSelect.val();
 
+        // Hide both sections initially and mark fields as not required
+        $realPersonWrapper.slideUp(250);
+        setFieldsRequired($realPersonWrapper, false);
+
+        $legalPersonWrapper.slideUp(250);
+        setFieldsRequired($legalPersonWrapper, false);
+
+        // Show the selected section and mark its fields as required
         if (personType === 'real') {
-            $legalPersonWrapper.slideUp(250);
             $realPersonWrapper.slideDown(350);
+            setFieldsRequired($realPersonWrapper, true);
         } else if (personType === 'legal') {
-            $realPersonWrapper.slideUp(250);
             $legalPersonWrapper.slideDown(350);
+            setFieldsRequired($legalPersonWrapper, true);
+        }
+    }
+
+    /**
+     * Shows/hides the entire buyer information section based on the invoice checkbox.
+     */
+    function toggleInvoiceSection() {
+        const isChecked = $invoiceCheckbox.is(':checked');
+
+        if (isChecked) {
+            // Show the main buyer info wrapper
+            $buyerInfoWrapper.slideDown(350);
+            // Mark person type as required
+            setFieldsRequired($personTypeSelect.closest('.form-row'), true);
+            // Trigger the person fields toggle to show the correct sub-section
+            togglePersonFields();
         } else {
-            $realPersonWrapper.slideUp(250);
-            $legalPersonWrapper.slideUp(250);
+            // Hide the main buyer info wrapper
+            $buyerInfoWrapper.slideUp(250);
+            // Mark all fields within as not required
+            setFieldsRequired($buyerInfoWrapper, false);
+            // Also hide the person-specific sub-wrappers
+            $realPersonWrapper.hide();
+            $legalPersonWrapper.hide();
         }
     }
 
@@ -31,11 +90,11 @@ jQuery(function($) {
      * Populates the custom city dropdown based on the custom state dropdown.
      */
     function populateCustomCities() {
-        var state = $('#billing_custom_state').val();
-        var $cityField = $('#billing_custom_city');
-        var originalCityVal = $('#billing_city').val(); // Get value from original hidden field
+        const state = $('#billing_custom_state').val();
+        const $cityField = $('#billing_custom_city');
+        const originalCityVal = $('#billing_city').val(); // Get value from original hidden field
 
-        $cityField.empty().append('<option value="">ابتدا استان را انتخاب کنید</option>');
+        $cityField.empty().append($('<option>', { value: '', text: 'ابتدا استان را انتخاب کنید' }));
 
         if (state && cities[state]) {
             $.each(cities[state], function(index, cityName) {
@@ -45,41 +104,41 @@ jQuery(function($) {
                     selected: cityName === originalCityVal
                 }));
             });
+             // After populating, if there was an original city value, ensure it's selected
+            if (originalCityVal) {
+                $cityField.val(originalCityVal);
+            }
         }
-        // After populating, ensure the custom city's value is synced to the original
+        // Ensure the custom city's value is synced to the original
         $cityField.trigger('change');
     }
 
-    // --- Synchronization Logic ---
+    // --- Event Handlers ---
 
-    // 1. When the VISIBLE custom state changes...
-    $('body').on('change', '#billing_custom_state', function() {
-        var selectedState = $(this).val();
-        // a. Update the HIDDEN original state field
-        $('#billing_state').val(selectedState);
-        // b. Manually trigger 'change' on the original field to make WC's AJAX work
-        $('#billing_state').trigger('change');
-        // c. Populate our custom city dropdown
+    // When the VISIBLE custom state changes...
+    $checkoutForm.on('change', '#billing_custom_state', function() {
+        $('#billing_state').val($(this).val()).trigger('change');
         populateCustomCities();
     });
 
-    // 2. When the VISIBLE custom city changes...
-    $('body').on('change', '#billing_custom_city', function() {
-        var selectedCity = $(this).val();
-        // a. Update the HIDDEN original city field
-        $('#billing_city').val(selectedCity);
-        // b. Manually trigger 'change' on the original field
-        $('#billing_city').trigger('change');
+    // When the VISIBLE custom city changes...
+    $checkoutForm.on('change', '#billing_custom_city', function() {
+        $('#billing_city').val($(this).val()).trigger('change');
     });
 
-    // --- Initial page load logic ---
+    // When the invoice checkbox changes...
+    $checkoutForm.on('change', '#billing_invoice_request', toggleInvoiceSection);
 
-    // Set initial custom state value from the original hidden field (in case of validation error reload)
+    // When the person type changes...
+    $checkoutForm.on('change', '#billing_person_type', togglePersonFields);
+
+    // --- Initial Page Load Logic ---
+
+    // Set initial custom state value from the original hidden field
     $('#billing_custom_state').val($('#billing_state').val());
     // Trigger the change handler to populate cities on load
-    $('#billing_custom_state').trigger('change');
+    populateCustomCities();
 
-    // Person fields
-    togglePersonFields();
-    $('body').on('change', '#billing_person_type', togglePersonFields);
+    // Set the initial state of the invoice and person sections
+    toggleInvoiceSection();
 });
